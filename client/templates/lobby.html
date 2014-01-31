@@ -1,0 +1,47 @@
+<template name="lobby">
+    {{#if isVisible}}
+        <h1>Game title</h1>
+        <button class="createGameButton">Create a game</button>
+
+        <h2>Games</h2>
+        {{> openGames}}
+
+        <h2>Players</h2>
+        {{> players}}
+    {{/if}}
+    {{> game_lobby}}
+</template>
+
+<template name="openGames">
+    <ul class="gamesList">
+        {{#each games}}
+            <li>{{ _id }}<button class="joinGame">Join</button></li>
+        {{/each}}
+    </ul>
+</template>
+
+<template name="players">
+    <h3>Invaders</h3>
+    {{#if isSeeker}}
+        <button class="joinInvader">join</button>
+    {{/if}}
+    <ul class="playersList">
+        {{#each invaders}}
+            <li>
+                {{name}}
+            </li>
+        {{/each}}
+    </ul>
+
+    <h3>Seekers</h3>
+    {{#if isInvader}}
+        <button class="joinSeeker">join</button>
+    {{/if}}
+    <ul class="playersList">
+        {{#each seekers}}
+            <li>
+                {{name}}
+            </li>
+        {{/each}}
+    </ul>
+</template>

@@ -1,0 +1,14 @@
+<template name="playerNameForm">
+    {{#if isVisible}}
+        <h1>The Game Title</h1>
+        <form class="playerNameForm">
+            <input type="text" id="playerName" placeholder="Username">
+            <p id="playerType">
+                <input type="radio" name="playerType" value="5"> Invader
+                <input type="radio" name="playerType" value="6"> Seeker
+                <input type="radio" name="playerType" value="0" checked="checked"> Random
+            </p>
+            <input type="submit" value="Enter lobby" class="setPlayerNameButton">
+        </form>
+    {{/if}}
+</template>

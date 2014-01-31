@@ -1,0 +1,15 @@
+<template name="game_lobby">
+    {{#if isVisible}}
+        <button class="leaveGameButton">Leave game</button>
+        <ul>
+            {{#each joinedPlayers}}
+                <li>
+                    {{ name }}
+                </li>
+            {{/each}}
+        </ul>
+        {{#if canStartGame}}
+            <button class="startGameButton">Start game</button>
+        {{/if}}
+    {{/if}}
+</template>
