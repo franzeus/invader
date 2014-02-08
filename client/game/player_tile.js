@@ -201,19 +201,27 @@ PlayerTile.prototype.handleTracking = function(otherPlayer) {
 
     if (!trackedObject) {
         this.trackedPlayers[collectionId] = 1;
+        World.setTrackingCounter(0);
     } else {
         this.trackedPlayers[collectionId] = trackedObject + 1;
     }
 
-    if (this.trackedPlayers[collectionId] >= 30) {
+    // timeout value depends of the value of the setTimeout in startInRadiusCheck()
+    var timeout = 30;
+    var currentCount = this.trackedPlayers[collectionId];
+    if (currentCount >= timeout) {
         this.setCatched(otherPlayer);
         otherPlayer.setCatched(this);
     }
+
+    var percentage = Math.round(currentCount / timeout * 100);
+    World.setTrackingCounter(percentage);
 };
 
 PlayerTile.prototype.removeFromTracking = function(otherPlayer) {
     if (this.trackedPlayers[otherPlayer.collectionId]) {
         delete this.trackedPlayers[otherPlayer.collectionId];
+        World.setTrackingCounter(0);
     }
 };
 

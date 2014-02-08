@@ -55,6 +55,7 @@ World = {
         this.height = screenHeight;
 
         this.snap = Snap(this.canvasId);
+
         this.createLayers();
 
         return this;
@@ -321,6 +322,18 @@ World = {
         // Check if all invaders have won
         if (this.invadersInExit.length === this.numbersOfInvaders) {
             console.log('All invaders have escaped!');
+        }
+    },
+
+    setTrackingCounter : function(currentCountInPercent) {
+        var width = (100 - currentCountInPercent) + '%';
+        var trackingBar = jQuery('.trackingBar');
+
+        if (currentCountInPercent > 0) {
+            trackingBar.show();
+            trackingBar.animate({ width: width }, 100);
+        } else {
+            trackingBar.hide();
         }
     },
 
