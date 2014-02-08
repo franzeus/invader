@@ -8,7 +8,6 @@ PlayerTile = function(_options) {
     this.currentCol = this.col;
     this.nextTile = null;
     this.radiusShape = null;
-    this.hasRadius = Session.equals('PlayerTile_type', 6);
 
     this.isPlayer = false;
     this.isVisible = true;
@@ -20,8 +19,13 @@ PlayerTile = function(_options) {
     this.lastMoveToY = null;
 
     this.velocity = 10;
-    this.radius = World.tileSize * 4;
+    this.radiusInGrid = 4;
+    this.radius = World.tileSize * (this.radiusInGrid);
     this.color = "#50126D";
+
+    this.trackedPlayers = {};
+    this.hasReachedExit = false;
+    this.hasBeenCaught = false;
 };
 
 PlayerTile.prototype = new Tile();
@@ -39,6 +43,10 @@ PlayerTile.prototype.drawShape = function() {
     return this.shape;
 };
 
+PlayerTile.prototype.isInactive = function() {
+    return this.hasReachedExit || this.hasBeenCaught;
+};
+
 PlayerTile.prototype.initMove = function() {
     this.nextTile = this.popQueue();
 
@@ -49,7 +57,12 @@ PlayerTile.prototype.initMove = function() {
 
 PlayerTile.prototype.move = function(tile) {
 
-    if (this.lastMoveToX === tile.x && this.lastMoveToY === tile.y) return;
+    if ((this.lastMoveToX === tile.x &&
+        this.lastMoveToY === tile.y) ||
+        this.isInactive()) {
+        return;
+    }
+    var self = this;
 
     // IF inAnimation, then stop the current animation
     var currentAnimation = this.shape.inAnim();
@@ -69,14 +82,15 @@ PlayerTile.prototype.move = function(tile) {
         }
     }
 
+    // Tell other players in game we have moved our own player tile
     if (this.isPlayer) {
         this.triggerMove(tile);
     }
 
     var distance = Math.round( Math.sqrt( Math.pow((tile.x - this.x), 2) + Math.pow((tile.y - this.y), 2)) );
+    // TODO: Fix when screen is bigger it will take longer than on a smaller device
+    // (Maybe: velocity = tileSize / x)
     var time = this.velocity * distance;
-
-    var self = this;
 
     if (this.radiusShape) {
         var tileCenter = tile.getMiddlePoint();
@@ -98,6 +112,7 @@ PlayerTile.prototype.move = function(tile) {
         self.currentCol = tile.col;
         self.initMove();
         tile.unhighlight();
+        self.collidedWithTile.call(self, tile);
     });
 
     this.lastMoveToX = tile.x;
@@ -137,11 +152,80 @@ PlayerTile.prototype.drawRadius = function() {
     return;
 };
 
+PlayerTile.prototype.collidedWithTile = function(otherTile) {
+    return;
+};
+
+PlayerTile.prototype.startInRadiusCheck = function() {
+
+    if (this.isInactive()) return;
+
+    var self = this;
+    setTimeout(function() {
+        self.playerInRadius();
+        self.startInRadiusCheck();
+    }, 100);
+};
+
+PlayerTile.prototype.playerInRadius = function() {
+    var num = World.playerTiles.length;
+
+    for (var i = 0; i < num; i++) {
+        var playerTile = World.playerTiles[i];
+
+        if (playerTile.type !== this.type && !playerTile.hasReachedExit && !playerTile.hasBeenCaught) {
+
+            var minRowInRadius = this.currentRow - this.radiusInGrid;
+            var maxRowInRadius = this.currentRow + this.radiusInGrid;
+            var minColInRadius = this.currentCol - this.radiusInGrid;
+            var maxColInRadius = this.currentCol + this.radiusInGrid;
+
+            if (minRowInRadius < playerTile.currentRow && playerTile.currentRow < maxRowInRadius &&
+                minColInRadius < playerTile.currentCol && playerTile.currentCol < maxColInRadius) {
+                this.handleTracking(playerTile);
+            } else {
+                this.removeFromTracking(playerTile);
+            }
+
+        }
+
+    };
+};
+
+PlayerTile.prototype.handleTracking = function(otherPlayer) {
+
+    if (otherPlayer.hasBeenCaught || otherPlayer.hasReachedExit) return;
+
+    var collectionId = otherPlayer.collectionId;
+    var trackedObject = this.trackedPlayers[collectionId];
+
+    if (!trackedObject) {
+        this.trackedPlayers[collectionId] = 1;
+    } else {
+        this.trackedPlayers[collectionId] = trackedObject + 1;
+    }
+
+    if (this.trackedPlayers[collectionId] >= 30) {
+        this.setCatched(otherPlayer);
+        otherPlayer.setCatched(this);
+    }
+};
+
+PlayerTile.prototype.removeFromTracking = function(otherPlayer) {
+    if (this.trackedPlayers[otherPlayer.collectionId]) {
+        delete this.trackedPlayers[otherPlayer.collectionId];
+    }
+};
+
+// ------------------------------------
+// SEEKER
 // ------------------------------------
 Seeker = function(_options) {
     PlayerTile.apply(this, arguments);
-    this.PlayerTileType = 6;
+    this.type = PlayerManager.SEEKER;
     this.showMasked = true;
+    this.startInRadiusCheck();
+    this.playersCaught = [];
 };
 Seeker.prototype = new PlayerTile();
 Seeker.prototype.drawRadius = function() {
@@ -173,10 +257,51 @@ Seeker.prototype.drawRadius = function() {
     }
 };
 
+Seeker.prototype.setCatched = function(catchedPlayerTile) {
+    this.playersCaught.push(catchedPlayerTile.collectionId);
+    this.removeFromTracking(catchedPlayerTile);
+};
+
+// ------------------------------------
+// INVADER
 // ------------------------------------
 Invader = function(_options) {
     PlayerTile.apply(this, arguments);
     this.color = '#2980b9';
-    this.PlayerTileType = 5;
+    this.type = PlayerManager.INVADER;
+    this.startInRadiusCheck();
 };
 Invader.prototype = new PlayerTile();
+
+Invader.prototype.collidedWithTile = function(otherTile) {
+
+    if (this.hasCollidedWithExitTile()) {
+        World.invaderReachedExitTile(this);
+        this.hasReachedExit = true;
+    }
+
+};
+
+// Returns true if this tile has collided with an exit tile
+Invader.prototype.hasCollidedWithExitTile = function() {
+
+    var hasReachedExit = false;
+    for (var i = 0; i < World.exitTiles.length; i++) {
+
+        var currentExitTile = World.exitTiles[i];
+
+        if (currentExitTile.row === this.currentRow &&
+            currentExitTile.col === this.currentCol) {
+                hasReachedExit = true;
+                break;
+        }
+
+    }
+
+    return hasReachedExit;
+};
+
+Invader.prototype.setCatched = function(fromPlayerTile) {
+    this.hasBeenCaught = true;
+    console.log('Catched invader');
+};

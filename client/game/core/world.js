@@ -21,12 +21,16 @@ World = {
     fixObjects : [],
     moveableObjects : [],
     floors : [],
+    exitTiles : [],
 
     layerIdPrefix : 'layer',
     isVisibleKey : 'isWorldVisible',
 
     player : null,
     playerTiles : [],
+    invadersInExit : [],
+    numbersOfInvaders : 0,
+    numbersOfSeekers : 0,
 
     startSyn : false,
 
@@ -104,6 +108,8 @@ World = {
 
         this.currentMap = level.tileMap;
         this.setSize();
+        this.numbersOfInvaders = invaders.length;
+        this.numbersOfSeekers = seekers.length;
 
         for (var r = 0; r < this.currentMap.length; r++) {
              for (var c = 0; c < this.currentMap[r].length; c++) {
@@ -112,11 +118,12 @@ World = {
                 var currentTile = this.tileFactory(tileKey, r, c);
 
                 // Add floor if necessary
-                if (currentTile.isMoveable || !currentTile.isVisible) {
+                if (currentTile.isMoveable || currentTile.isPassable || !currentTile.isVisible) {
                     var floorTile = this.tileFactory(0, r, c);
                     this.setFloorTileEdges(floorTile, r, c, this.currentMap);
                     floorTile.draw().bindEvents();
                     this.snap.select('#' + this.layerIdPrefix + '0').add(floorTile.shapeGroup);
+                    currentTile.underlayingTile = floorTile;
                 }
 
                 //lastTile = (r === this.currentMap.length - 1) && (c === this.currentMap[r].length - 1) ? currentTile : null;
@@ -124,6 +131,11 @@ World = {
                 if (tileKey === 0) {
                     this.setFloorTileEdges(currentTile, r, c, this.currentMap);
                     this.floors.push(currentTile);
+                }
+
+                // Exit tile
+                if (tileKey === 3) {
+                    this.exitTiles.push(currentTile);
                 }
 
                 // INVADER
@@ -216,8 +228,8 @@ World = {
                         1   |0|X|0|
                         2   |_|0|_|
                     */
-                    // Its a floor
-                    if (currentColKey === 0) {
+                    // Its a floor or exit
+                    if (currentColKey === 0 || currentColKey === 3) {
 
                         /*
                         var add = false;
@@ -255,11 +267,11 @@ World = {
         return edges;
     },
 
-    onClickTile : function(tile, isDblclick) {
+    onClickTile : function(tile) {
 
         var self = this;
 
-        if (tile.type === this.objectDict[0]) {
+        if (tile.type === this.objectDict[0] && !this.player.isInactive()) {
 
             // If the animation is not ready yet, it may happen
             // that not all tiles in queue are reset
@@ -284,20 +296,32 @@ World = {
 
     syncMove : function(id, fields) {
 
+        // Syncing the current player is not neccessary
         if (!this.startSyn || this.player.collectionId === id) return;
 
-        var player = this.getPlayerTile(id);
+        var otherPlayer = this.getPlayerTile(id);
 
-        if (player) {
-            var row = fields.row || player.currentRow;
-            var col = fields.col || player.currentCol;
-            var tile = this.graph[row + '_' + col];
+        if (otherPlayer) {
+            var row = fields.row || otherPlayer.currentRow;
+            var col = fields.col || otherPlayer.currentCol;
+            var targetTile = this.graph[row + '_' + col];
 
-            if (tile) {
-                player.move(tile);
+            if (targetTile) {
+                otherPlayer.move(targetTile);
             }
         }
 
+    },
+
+    // Triggered from invader tile when reached exit tile
+    invaderReachedExitTile : function(invaderTile) {
+        console.log("Invader reached exit tile");
+        this.invadersInExit.push(invaderTile);
+
+        // Check if all invaders have won
+        if (this.invadersInExit.length === this.numbersOfInvaders) {
+            console.log('All invaders have escaped!');
+        }
     },
 
     getPlayerTile : function(collectionId) {

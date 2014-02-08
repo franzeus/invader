@@ -23,6 +23,8 @@ Tile = function(_options) {
     this.isMoveable = false;
     this.isPassable = true;
 
+    this.underlayingTile = null;
+
     this.queue = [];
 
     jQuery.extend(this, _options);
@@ -120,10 +122,18 @@ Tile.prototype.popQueue = function() {
     return tile;
 };
 
-Tile.prototype.onClick = function(isDblClick) {
-    World.onClickTile(this, isDblClick);
+Tile.prototype.onClick = function() {
+    if (this.underlayingTile) {
+         World.onClickTile(this.underlayingTile);
+    } else {
+        World.onClickTile(this);
+    }
 };
 
 Tile.prototype.getTileCoord = function() {
     return this.row + '_' + this.col;
+};
+
+Tile.prototype.collidedWithTile = function(otherTile) {
+    return;
 };
